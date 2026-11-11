@@ -27,7 +27,7 @@ class CytoTRACE:
         gcs_genes: (n_genes,) Pearson r with gene counts, sorted descending.
         counts: (n,) number of detectably expressed genes per cell.
         gene_names: list of genes retained.
-        cell_names: list of cells retained.
+        cell_names: original cell order; filtered cells have NaN scores/counts.
     """
     cytotrace: np.ndarray
     cytotrace_rank: np.ndarray
@@ -58,16 +58,15 @@ def _census_normalize(mat_log2: np.ndarray, counts: np.ndarray) -> np.ndarray:
 def _most_variable_genes(matn: np.ndarray, n_top: int = 1000) -> np.ndarray:
     """Top-n_top genes by dispersion (var/mean) among genes expressed in ≥5% cells."""
     n_expr = (matn > 0).sum(axis=1)
-    keep = n_expr >= int(0.05 * matn.shape[1])
+    keep = n_expr >= 0.05 * matn.shape[1]
     if keep.sum() == 0:
         return np.arange(matn.shape[0])
     sub = matn[keep]
     means = sub.mean(axis=1)
     vars_ = sub.var(axis=1)
     disp = vars_ / np.maximum(means, 1e-12)
-    order_in_sub = np.argsort(disp)[::-1]
-    sub_idx = np.where(keep)[0][order_in_sub[: min(n_top, sub.shape[0])]]
-    return np.sort(sub_idx)
+    cutoff = np.sort(disp)[-min(n_top, len(disp))]
+    return np.flatnonzero(keep)[disp >= cutoff]
 
 
 def _similarity_matrix(mat: np.ndarray) -> np.ndarray:
@@ -106,12 +105,19 @@ def cytotrace_run(
     *,
     gene_names: list[str] | None = None,
     cell_names: list[str] | None = None,
+    input_scale: str = "counts",
 ) -> CytoTRACE:
     """End-to-end CytoTRACE pipeline.
 
     Args:
         mat: (n_genes × n_cells) raw count matrix.
         gene_names / cell_names: optional explicit names.
+        input_scale: "counts" (default), "log2", or "auto" for the R
+            heuristic (inverse log2 when the matrix maximum is below 50).
+            Explicit counts avoids misclassifying low-depth integer counts.
+
+    Cells with at most ten detected genes receive NaN scores, as in R.
+    Use all measured genes before highly-variable-gene selection.
     """
     if isinstance(mat, pd.DataFrame):
         gene_names = list(mat.index)
@@ -119,15 +125,41 @@ def cytotrace_run(
         M = mat.to_numpy(dtype=np.float64)
     else:
         M = np.asarray(mat, dtype=np.float64)
+        if M.ndim != 2:
+            raise ValueError("mat must be a two-dimensional genes-by-cells matrix.")
         if gene_names is None:
             gene_names = [f"gene_{i}" for i in range(M.shape[0])]
         if cell_names is None:
             cell_names = [f"cell_{i}" for i in range(M.shape[1])]
 
+    if M.ndim != 2 or min(M.shape) < 2:
+        raise ValueError("mat must contain at least two genes and two cells.")
+    if not np.isfinite(M).all() or (M < 0).any():
+        raise ValueError("mat must contain finite, nonnegative expression values.")
+    if len(gene_names) != M.shape[0] or len(cell_names) != M.shape[1]:
+        raise ValueError("gene_names and cell_names must match mat dimensions.")
+    if len(set(gene_names)) != len(gene_names):
+        raise ValueError("gene_names must be unique.")
+    if input_scale not in {"counts", "log2", "auto"}:
+        raise ValueError("input_scale must be counts, log2, or auto.")
+    original_n_cells = M.shape[1]
+
     # 1. Filter zero-variance genes
     pq = (M.sum(axis=1) == 0) | (M.var(axis=1) == 0)
     M = M[~pq]
     gene_names = [g for g, drop in zip(gene_names, pq) if not drop]
+
+    if M.shape[0] < 2:
+        raise ValueError("At least two variable genes are required.")
+    if input_scale == "log2" or (input_scale == "auto" and M.max() < 50):
+        M = np.exp2(M) - 1
+    keep_genes = np.array(["ERCC-" not in str(g) for g in gene_names])
+    M = M[keep_genes]
+    gene_names = [g for g, keep in zip(gene_names, keep_genes) if keep]
+    retained_cells = np.flatnonzero((M > 0).sum(axis=0) > 10)
+    if len(retained_cells) < 2 or M.shape[0] < 2:
+        raise ValueError("At least two cells with more than ten detected genes are required.")
+    M = M[:, retained_cells]
 
     # 2. Per-cell sequencing depth normalisation → log2
     col_sums = np.maximum(M.sum(axis=0), 1e-12)
@@ -143,6 +175,15 @@ def cytotrace_run(
 
     # 5. Find most-variable genes
     mvg_idx = _most_variable_genes(M_norm, n_top=1000)
+
+    keep_cells = M_norm[mvg_idx].sum(axis=0) > 0
+    if not keep_cells.all():
+        retained_cells = retained_cells[keep_cells]
+        M_norm = M_norm[:, keep_cells]
+        counts = counts[keep_cells]
+        if len(retained_cells) < 2:
+            raise ValueError("Fewer than two cells express the selected variable genes.")
+        mvg_idx = _most_variable_genes(M_norm, n_top=1000)
 
     # 6. Cell-cell similarity from MVGs
     S = _similarity_matrix(M_norm[mvg_idx])
@@ -176,13 +217,18 @@ def cytotrace_run(
     cyto_genes = pd.Series(num2 / np.maximum(den2, 1e-12),
                            index=gene_names).sort_values(ascending=False)
 
+    def restore(values):
+        out = np.full(original_n_cells, np.nan)
+        out[retained_cells] = values
+        return out
+
     return CytoTRACE(
-        cytotrace=cytotrace,
-        cytotrace_rank=cytotrace_rank,
+        cytotrace=restore(cytotrace),
+        cytotrace_rank=restore(cytotrace_rank),
         cyto_genes=cyto_genes,
-        gcs=gcs,
+        gcs=restore(gcs),
         gcs_genes=pearson_gc,
-        counts=counts,
+        counts=restore(counts),
         gene_names=gene_names,
         cell_names=cell_names,
     )

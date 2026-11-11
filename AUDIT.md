@@ -1,24 +1,10 @@
-## R function coverage audit
+# Scoped R function mapping
 
-### Coverage summary
-
-| Category | Ported | Total | % |
-|---|---|---|---|
-| Exported R functions | 1 | 4 | 25.0% |
-| Internal helpers (reachable) | 0 | 0 | 0.0% |
-
-_Python package exposes 8 unique names._
-
-### Exported R functions
-
-| R function | Python equivalent | Status |
+| R function | Python entry point | Validation scope |
 |---|---|---|
-| `CytoTRACE` | `—` | ❌ MISSING |
-| `iCytoTRACE` | `—` | ❌ MISSING |
-| `plotCytoGenes` | `plot_cyto_genes` | ✅ ported |
-| `plotCytoTRACE` | `—` | ❌ MISSING |
+| CytoTRACE | cytotrace_run | Direct real-marrow comparison, no batch correction or fast subsampling |
+| plotCytoTRACE | plot_cytotrace | Python plotting API; not pixel equivalence |
+| plotCytoGenes | plot_cyto_genes | Python plotting API; not pixel equivalence |
+| iCytoTRACE | Unimplemented | No equivalence claim |
 
-### Internal helpers reachable from exports
-
-| R helper | File | Python equivalent | Status |
-|---|---|---|---|
+Name matching alone missed the core entry point in the historical audit. This mapping describes supported APIs; it is not a percentage of algorithmic equivalence. See RECONSTRUCTION_REPORT.md for measured R errors and remaining limits.

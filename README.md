@@ -13,6 +13,8 @@ pip install pycytotrace-bio
 ```
 (module name is `pycytotrace`.)
 
+For the optional plotting example, install `pycytotrace-bio[plot]`. The numerical core does not require the plotting extra.
+
 ## Quick-start
 
 ```python
@@ -49,3 +51,7 @@ ggsave("out.png",
 ## License
 
 MIT.
+
+## Updated real-data validation
+
+See [measured R comparisons and limitations](RECONSTRUCTION_REPORT.md) and the executed real-data notebook in `examples/`. Synthetic signal tests are not evidence of R equivalence.

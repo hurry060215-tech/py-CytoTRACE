@@ -19,7 +19,11 @@ from __future__ import annotations
 __version__ = "0.1.0"
 
 from .core import CytoTRACE, cytotrace_run
-from .plotting import plot_cytotrace, plot_cyto_genes
+def __getattr__(name):
+    if name in {"plot_cytotrace", "plot_cyto_genes"}:
+        from . import plotting
+        return getattr(plotting, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
     "CytoTRACE",

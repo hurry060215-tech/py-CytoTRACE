@@ -1,4 +1,4 @@
-"""Parity test against gold synthetic ordering (R CytoTRACE not installable in env)."""
+"""Synthetic signal sanity checks; direct R parity is tested separately."""
 import sys
 from pathlib import Path
 import numpy as np
@@ -11,8 +11,7 @@ import pycytotrace
 
 def test_recovers_gene_count_signal():
     """CytoTRACE's principal signal is detected-gene count; the algorithm's
-    smoothed score should correlate strongly with raw gene counts. This is the
-    structural correctness check the upstream paper relies on for unit testing."""
+    smoothed score should correlate strongly with raw gene counts. This is a synthetic sanity check, not an R/Python equivalence test."""
     rng = np.random.RandomState(42)
     n_cells, n_genes = 100, 200
     counts = rng.poisson(2.0, (n_genes, n_cells)).astype(float)
