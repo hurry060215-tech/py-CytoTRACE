@@ -1,0 +1,18 @@
+{
+  "upstream_repository": "https://github.com/gunsagargulati/CytoTRACE",
+  "validation_date": "2026-11-10",
+  "fixtures": {
+    "examples/data/marrow_reference.npz": {
+      "sha256": "b3a13d8ddd7d07eb9ae75a16d2359884560357a1572f63d0e335c7248ffed6a1",
+      "bytes": 568808
+    },
+    "tests/data/edge_marrow_reference.npz": {
+      "sha256": "a253c50d05a0c4889775440154ad563dc3dbd960a0e8264191e957fb39fe5922",
+      "bytes": 569823
+    },
+    "tests/data/marrow_reference.npz": {
+      "sha256": "b3a13d8ddd7d07eb9ae75a16d2359884560357a1572f63d0e335c7248ffed6a1",
+      "bytes": 568808
+    }
+  }
+}

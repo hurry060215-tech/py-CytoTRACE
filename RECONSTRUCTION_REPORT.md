@@ -1,75 +1,34 @@
-# Reconstruction Report — py-CytoTRACE v0.1.0
+# CytoTRACE reconstruction and measured validation
 
-## 1. Identity
+Validation date: 2026-11-10. This report supersedes the earlier synthetic-only parity claim. Correlation with detected-gene count is a sanity check, not an R comparison. The former test_exact_match.py is now test_synthetic_signal.py; actual R-output tests are in test_r_reference.py.
 
-| Field | Value |
-|---|---|
-| Python package | `pycytotrace` (PyPI dist `pycytotrace-bio`) |
-| Upstream R package | `CytoTRACE` v0.3.1 |
-| Upstream source | https://github.com/gunsagargulati/CytoTRACE |
-| Citation | Gulati et al. *Science* 2020 (~500 citations) |
-| Algorithm class | ordinal (developmental potency score) |
-| Threshold | Spearman ≥ 0.60 vs ground-truth ordering |
-| **Measured parity** | **0.85+** on synthetic stemness gradient |
-| Audit class | **A** — translation-only |
-| LOC | ~250 Python |
+## Supported scope
 
-## 2. R function coverage audit
+The port implements the single-batch, non-subsampled core. ComBat, fast-mode subsampling, and iCytoTRACE remain unimplemented. The default accepts explicit genes-by-cells raw counts. input_scale="auto" reproduces R's maximum-below-50 inverse-log heuristic; input_scale="log2" accepts explicit log2 input. Explicit counts avoid misclassifying low-depth integer counts.
 
-See [`AUDIT.md`](AUDIT.md).
+The repair retains the exact prevalence threshold, includes tied variable-gene dispersions at the cutoff, removes ERCC rows, filters cells with at most ten detected genes, and restores filtered cells as NaN in their original positions. Optional plotting no longer prevents importing the numerical core when ggplot2-python is absent.
 
-| Function | Status |
-|---|---|
-| `CytoTRACE` | ✅ ported as `cytotrace_run` |
-| `plotCytoTRACE` | ✅ ported as `plot_cytotrace` |
-| `plotCytoGenes` | ✅ ported as `plot_cyto_genes` |
-| `iCytoTRACE` (multi-batch integration) | ⏳ v0.2 |
-| `batch=` arg (ComBat correction) | ⏳ v0.2 |
-| `enableFast=TRUE` (subsampling) | ⏳ v0.2 |
+## Direct R comparison
 
-## 3. Parity evidence
+Reference: gunsagargulati/CytoTRACE@f4ff6c0ab93cc704eef44e17adcd5c6baf09703a. The unmodified CytoTRACE function ran with enableFast=FALSE, one core, and no batch labels. HiClimR and ccaPP were installed in an isolated validation library; reference functions were not replaced with Python.
 
-Fixture: synthetic stemness gradient (100 cells, 200 genes; early-index cells have more detected genes).
+| Input | Score maximum error | Rank difference | Count difference | GCS maximum error |
+|---|---:|---:|---:|---:|
+| Real marrow: 13,526 genes x 120 cells | 5.00e-16 | 0 | 0 | 7.78e-15 |
+| Same counts + ERCC row + poor-quality cell | 5.00e-16 | 0 | 0 | 7.78e-15 |
 
-R reference run **not possible in this env** — `HiClimR` requires `ncdf4` C library which the env lacks. Compare notebook validates against the known ground-truth gradient instead:
+Spearman agreement is 1 within numerical precision; the missing-score position also agrees. Controls are artificial, underlying marrow counts are real. No speedup or all-dataset equivalence is claimed.
 
-| Output | Class | Threshold | Measured | Pass |
-|---|---|---|---|---|
-| CytoTRACE score vs gold rank | ordinal | Spearman ≥ 0.60 | **0.85+** | ✅ |
-| CytoTRACE score vs detected-gene count | sanity | Spearman ≥ 0.80 | **0.95+** | ✅ |
+## Reproduction
 
-Outside this env, R parity should be re-established. The algorithm is faithful to the R source (each step has a one-line correspondence).
+- examples/real_marrow_R_parity.ipynb: executed comparison and figures.
+- tests/data/*.npz: compact inputs and actual R outputs used by regression tests.
+- validation/provenance.json: hashes; metrics.json: errors; R-sessionInfo.txt: versions.
+- validation/run_r_reference.R: original R execution with an upstream checkout.
 
-## 4. Acceleration evidence
+```sh
+Rscript validation/run_r_reference.R /path/to/CytoTRACE /path/to/output
+python -m pytest -q
+```
 
-None. Class A.
-
-## 5. Code quality
-
-| Check | Status |
-|---|---|
-| `pip install -e .` | ✅ |
-| `pytest -q` | ✅ 2/2 |
-| 4 notebooks executed | ✅ |
-| README + MATH + AUDIT + DISCOVERY + this report | ✅ |
-| Version 0.1.0 | ✅ |
-
-## 6. Known limitations
-
-1. **Batch correction (ComBat) deferred** to v0.2.
-2. **Fast-mode subsampling** (for >3000 cells) deferred.
-3. **iCytoTRACE** (multi-batch integration) deferred.
-4. **No R-side parity run** in current env — gold ground-truth comparison only.
-
-## 7. omicverse integration
-
-- `omicverse.external.pycytotrace` (planned)
-- Complementary to other ordinal-pseudotime ports (the others derive time from graph traversal; CytoTRACE derives potency from gene-count signal).
-
-## 8. Sign-off
-
-| Field | Value |
-|---|---|
-| Author | claude-opus-4-7 via omicverse-rebuildr |
-| Date | 2026-05-24 |
-| Audit class | A |
+The fixture retains all genes in the first 120 columns of upstream marrow_10x_expr. The corrected official OmicVerse pancreas tutorial executes a documented 300-cell subset with all 27,998 genes and raw counts. Supplied PCA/UMAP coordinates are visualization only. Gene names are forwarded by the integration for ERCC filtering. This tutorial is not a full-cohort benchmark.
