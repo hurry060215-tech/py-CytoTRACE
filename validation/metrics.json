@@ -1,0 +1,26 @@
+{
+  "original": {
+    "shape": [
+      13526,
+      120
+    ],
+    "nan_pattern_equal": true,
+    "spearman": 1.0,
+    "score_max_absolute_error": 4.996003610813204e-16,
+    "rank_max_absolute_error": 0.0,
+    "counts_max_absolute_error": 0.0,
+    "gcs_max_absolute_error": 7.771561172376096e-15
+  },
+  "edge_": {
+    "shape": [
+      13527,
+      121
+    ],
+    "nan_pattern_equal": true,
+    "spearman": 0.9999999999999998,
+    "score_max_absolute_error": 4.996003610813204e-16,
+    "rank_max_absolute_error": 0.0,
+    "counts_max_absolute_error": 0.0,
+    "gcs_max_absolute_error": 7.771561172376096e-15
+  }
+}
